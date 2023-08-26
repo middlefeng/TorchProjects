@@ -50,9 +50,9 @@
 		553A5C262A8D110E003E2052 = {
 			isa = PBXGroup;
 			children = (
+				553A5C302A8D110E003E2052 /* Products */,
 				553A5C312A8D110E003E2052 /* TorchNNTest */,
 				553A5C3F2A8D12B8003E2052 /* Frameworks */,
-				553A5C302A8D110E003E2052 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
@@ -258,7 +258,7 @@
 		553A5C372A8D110E003E2052 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				CODE_SIGN_STYLE = Automatic;
 				HEADER_SEARCH_PATHS = (
 					"\"$(SRCROOT)/../torch/include\"",
@@ -272,7 +272,7 @@
 		553A5C382A8D110E003E2052 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				CODE_SIGN_STYLE = Automatic;
 				HEADER_SEARCH_PATHS = (
 					"\"$(SRCROOT)/../torch/include\"",
