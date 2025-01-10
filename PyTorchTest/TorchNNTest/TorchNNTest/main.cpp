@@ -22,7 +22,7 @@ public:
     torch::Tensor forward(torch::Tensor x)
     {
         return _sequential->forward(x);
-    }
+    } //
     
 private:
     
@@ -74,15 +74,20 @@ void training_loop(int epochs, torch::optim::Optimizer* optimizer,
 
 int main(int argc, const char * argv[])
 {
-    torch::Tensor t_c = torch::tensor({0.5,  14.0, 15.0, 28.0, 11.0,  8.0,  3.0, -4.0,  6.0, 13.0, 21.0});
-    torch::Tensor t_u = torch::tensor({35.7, 55.9, 58.2, 81.9, 56.3, 48.9, 33.9, 21.8, 48.4, 60.4, 68.4});
+    printf("CUDA Available: %s.\n", torch::cuda::is_available() ? "YES" : "NO");
+    printf("Config: %s.\n", torch::show_config().c_str());
+
+    auto device = torch::device(torch::kCUDA);
+
+    torch::Tensor t_c = torch::tensor({0.5,  14.0, 15.0, 28.0, 11.0,  8.0,  3.0, -4.0,  6.0, 13.0, 21.0}, device);
+    torch::Tensor t_u = torch::tensor({35.7, 55.9, 58.2, 81.9, 56.3, 48.9, 33.9, 21.8, 48.4, 60.4, 68.4}, device);
     t_c = t_c.unsqueeze(1);
     t_u = t_u.unsqueeze(1);
     
     long long nSamples = t_u.sizes()[0];
     long long nVal = 0.2 * nSamples;
     
-    torch::Tensor shuffledIndices = torch::randperm(nSamples);
+    torch::Tensor shuffledIndices = torch::randperm(nSamples, device);
     
     torch::Tensor train_indices = shuffledIndices.slice(0, 0, nSamples - nVal);
     torch::Tensor val_indices = shuffledIndices.slice(0, nSamples - nVal, nSamples);
@@ -101,8 +106,11 @@ int main(int argc, const char * argv[])
     
     SequentialTanh tanModel;
     torch::optim::SGD optimizer(tanModel->parameters(), 1e-3);
-    
+
     auto lossFunc = torch::nn::MSELoss();
+
+    tanModel->to(torch::kCUDA);
+    lossFunc->to(torch::kCUDA);
     
     training_loop(6001, &optimizer, tanModel, lossFunc,
                   unTraining, unVal, cTraining, cVal);
