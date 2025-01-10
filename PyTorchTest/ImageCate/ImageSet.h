@@ -19,4 +19,8 @@ struct ImageData
 };
 
 
+extern std::vector<ImageData> parseCIFAR10Binary(const std::string& filePath);
+extern void saveAsPPM(const std::string& fileName, const std::vector<uint8_t>& imageData);
+
+
 #endif

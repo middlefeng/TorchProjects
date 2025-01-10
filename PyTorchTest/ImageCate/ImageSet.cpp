@@ -36,3 +36,33 @@ std::vector<ImageData> parseCIFAR10Binary(const std::string& filePath)
     file.close();
     return images;
 }
+
+
+
+void saveAsPPM(const std::string& fileName, const std::vector<uint8_t>& imageData)
+{
+    std::ofstream outFile(fileName, std::ios::binary);
+    if (!outFile.is_open())
+    {
+        throw std::runtime_error("Failed to open file: " + fileName);
+    }
+
+    // Write the PPM header
+    outFile << "P6\n";
+    outFile << "32 32\n";
+    outFile << "255\n";
+
+    for (size_t index = 0; index < kImageSize * kImageSize; ++index)
+    {
+        uint8_t pixel[3];
+        pixel[0] = imageData[index];
+        pixel[1] = imageData[index + kImageSize * kImageSize];
+        pixel[2] = imageData[index + kImageSize * kImageSize * 2];
+
+        outFile.write(reinterpret_cast<const char*>(pixel), 3);
+    }
+
+    outFile.close();
+    std::cout << "Image saved to " << fileName << "\n";
+}
+
