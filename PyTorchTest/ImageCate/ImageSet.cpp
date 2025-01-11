@@ -1,8 +1,15 @@
 
 
 #include <fstream>
+#include <iostream>
 #include "ImageSet.h"
 
+#include <stdio.h>
+
+
+static const int kImageSize = 32;   // Image dimension (32x32)
+static const int kChannels = 3;     // RGB channels
+static const int kImageBytes = kImageSize * kImageSize * kChannels; // Total bytes per image
 
 
 std::vector<ImageData> parseCIFAR10Binary(const std::string& filePath)
@@ -15,7 +22,8 @@ std::vector<ImageData> parseCIFAR10Binary(const std::string& filePath)
 
     std::vector<ImageData> images;
 
-    while (file.peek() != EOF) {
+    while (file.peek() != EOF)
+    {
         ImageData img;
         img.data.resize(kImageByte);
 
@@ -35,6 +43,16 @@ std::vector<ImageData> parseCIFAR10Binary(const std::string& filePath)
 
     file.close();
     return images;
+}
+
+
+
+torch::Tensor imageDataToTensor(const ImageData& data)
+{
+    auto dataPtr = const_cast<uint8_t*>(data.data.data());
+    auto tensor = torch::from_blob(reinterpret_cast<void*>(dataPtr), {3, 32, 32}, torch::kUInt8);
+    auto tensorFloat = tensor.to(torch::kFloat32) / 255.f;
+    return tensorFloat.to(torch::kCUDA);
 }
 
 
@@ -63,6 +81,5 @@ void saveAsPPM(const std::string& fileName, const std::vector<uint8_t>& imageDat
     }
 
     outFile.close();
-    std::cout << "Image saved to " << fileName << "\n";
 }
 

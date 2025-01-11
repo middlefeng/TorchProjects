@@ -6,6 +6,7 @@
 
 
 #include <vector>
+#include <torch/torch.h>
 
 
 const static size_t kImageByte = 32 * 32 * 3;

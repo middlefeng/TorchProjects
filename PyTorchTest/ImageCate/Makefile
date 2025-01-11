@@ -12,7 +12,7 @@ LIBS  := -ltorch -lc10 -ltorch_cpu -Wl,-rpath,$(TORCH_LIB_PATH)
 all: main
 
 main: main.o ImageSet.o
-	g++ $< $(FLAGS) $(LIBS) -o main
+	g++ $^ $(FLAGS) $(LIBS) -o main
 
 %.o: %.cpp
 	g++ $(FLAGS) -c $< -o $@
