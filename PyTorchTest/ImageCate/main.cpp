@@ -10,6 +10,8 @@
 
 #include <memory>
 
+#include "ImageSet.h"
+#include "ImageCategoryNet.h"
 
 
 class SequentialTanhImpl : public torch::nn::Module
@@ -72,12 +74,94 @@ void training_loop(int epochs, torch::optim::Optimizer* optimizer,
 }
 
 
+
+
+const static char* kDataPath = "../../../../train_data/cifar-10-binary/cifar-10-batches-bin/data_batch_1.bin";
+
+
+
+void printTensorShape(const torch::Tensor& tensor) {
+    std::cout << "Shape: [";
+    for (size_t i = 0; i < tensor.sizes().size(); ++i) {
+        std::cout << tensor.sizes()[i];
+        if (i < tensor.sizes().size() - 1) {
+            std::cout << ", ";
+        }
+    }
+    std::cout << "]" << std::endl;
+}
+
+
+
 int main(int argc, const char * argv[])
 {
-    printf("CUDA Available: %s.\n", torch::cuda::is_available() ? "YES" : "NO");
-    printf("Config: %s.\n", torch::show_config().c_str());
+    std::vector<ImageData> data = parseCIFAR10Binary(kDataPath);
+    printf("Data Set: %ld.\n", data.size());
+
+    for (size_t i = 0; i < 4; ++i)
+    {
+        char path[20];
+        snprintf(path, 20, "./test%02ld.ppm", i);
+
+        saveAsPPM(path, data[i].data);
+
+        printf("Save Image %02ld, Label %u.\n", i, data[i].label);
+
+    //saveAsPPM("./test0.ppm", data[0].data);
+    //saveAsPPM("./test1.ppm", data[1].data);
+    //saveAsPPM("./test2.ppm", data[2].data);
+    }
+
+
+    //printf("CUDA Available: %s.\n", torch::cuda::is_available() ? "YES" : "NO");
+    //printf("Config: %s.\n", torch::show_config().c_str());
 
     auto device = torch::device(torch::kCUDA);
+
+
+    torch::Tensor image1Tensor1 = imageDataToTensor(data[1]);
+    torch::Tensor image1Tensor2 = imageDataToTensor(data[2]);
+    torch::Tensor imageTensor = torch::stack({image1Tensor1, image1Tensor2}, 0);
+
+    ImageCategoryNet categoryNet;
+    categoryNet->to(torch::kCUDA);
+
+    printf("Model created.\n");
+
+    auto categoryTensor = categoryNet(imageTensor.to(torch::kCUDA));
+
+    printTensorShape(categoryTensor);
+    printf("Forward pass.\n");
+
+
+/*
+    ImageDataSet dataSet(data);
+    //auto batchedDataset = torch::data::datasets::BatchDataset<ImageDataSet, torch::data::Example<>>(
+    //    dataSet, 64);
+
+    //auto dataLoader = torch::data::make_data_loader(dataSet
+    //);
+
+    auto sampler = torch::data::samplers::RandomSampler(dataSet.size().value());
+    // auto sequentialSampler = torch::data::samplers::SequentialSampler(dataSet.size().value());
+    auto dataLoader = torch::data::make_data_loader(
+        dataSet, sampler, torch::data::DataLoaderOptions().batch_size(64));
+
+    //printf("Number of batches: %ld.\n", dataLoader->size());
+
+    for (std::vector<torch::data::Example<>>& batch : *dataLoader)
+    {
+        printf("Batch size: %ld.\n", batch.size());
+        for (const auto& batchItem : batch) {
+            torch::Tensor tensor = batchItem.data;
+
+            printTensorShape(tensor);
+        }
+
+        //printTensorShape(batch.label);
+    }
+    */
+
 
     torch::Tensor t_c = torch::tensor({0.5,  14.0, 15.0, 28.0, 11.0,  8.0,  3.0, -4.0,  6.0, 13.0, 21.0}, device);
     torch::Tensor t_u = torch::tensor({35.7, 55.9, 58.2, 81.9, 56.3, 48.9, 33.9, 21.8, 48.4, 60.4, 68.4}, device);

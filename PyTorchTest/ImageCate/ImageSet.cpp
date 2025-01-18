@@ -52,7 +52,7 @@ torch::Tensor imageDataToTensor(const ImageData& data)
     auto dataPtr = const_cast<uint8_t*>(data.data.data());
     auto tensor = torch::from_blob(reinterpret_cast<void*>(dataPtr), {3, 32, 32}, torch::kUInt8);
     auto tensorFloat = tensor.to(torch::kFloat32) / 255.f;
-    return tensorFloat.to(torch::kCUDA);
+    return tensorFloat;
 }
 
 
@@ -82,4 +82,46 @@ void saveAsPPM(const std::string& fileName, const std::vector<uint8_t>& imageDat
 
     outFile.close();
 }
+
+
+
+ImageDataSet::ImageDataSet(const std::vector<ImageData>& data)
+: _imageData(data)
+{
+}
+
+
+torch::optional<size_t> ImageDataSet::size() const
+{
+    return _imageData.size();
+}
+
+
+torch::data::Example<> ImageDataSet::get(size_t index)
+{
+    printf("Get data item: %ld.\n", index);
+
+    auto data = _imageData[index];
+    auto dataTensor = imageDataToTensor(data);
+    auto labelTensor = torch::tensor(static_cast<int64_t>(data.label), torch::kLong);
+
+    return {dataTensor, labelTensor};
+}
+
+
+/*std::vector<torch::data::Example<>> ImageDataSet::get_batch(torch::ArrayRef<size_t> indices)
+ {
+    std::vector<torch::data::Example<>> batch;
+    for (auto index : indices)
+    {
+         batch.push_back(get(index));
+    }
+    return batch;
+}*/
+
+
+/*void ImageDataSet::reset() override
+{
+    std::shuffle(_indices.begin(), _indices.end(), _rng); // Shuffle indices
+}*/
 
