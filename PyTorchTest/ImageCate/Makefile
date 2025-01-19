@@ -11,7 +11,7 @@ LIBS  := -ltorch -lc10 -ltorch_cpu -Wl,-rpath,$(TORCH_LIB_PATH)
 
 all: main
 
-main: main.o ImageSet.o ImageCategoryNet.o
+main: main.o ImageSet.o ImageCategoryNet.o TorchUtils.o
 	g++ $^ $(FLAGS) $(LIBS) -o main
 
 %.o: %.cpp
