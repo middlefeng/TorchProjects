@@ -12,6 +12,7 @@
 
 #include "ImageSet.h"
 #include "ImageCategoryNet.h"
+#include "TorchUtils.h"
 
 
 class SequentialTanhImpl : public torch::nn::Module
@@ -76,10 +77,51 @@ void training_loop(int epochs, torch::optim::Optimizer* optimizer,
 
 
 
-const static char* kDataPath = "../../../../train_data/cifar-10-binary/cifar-10-batches-bin/data_batch_1.bin";
+const static char* kDataPath[] = {
+    "../../../../train_data/cifar-10-binary/cifar-10-batches-bin/data_batch_1.bin",
+    "../../../../train_data/cifar-10-binary/cifar-10-batches-bin/data_batch_2.bin",
+    "../../../../train_data/cifar-10-binary/cifar-10-batches-bin/data_batch_3.bin",
+    "../../../../train_data/cifar-10-binary/cifar-10-batches-bin/data_batch_4.bin",
+    "../../../../train_data/cifar-10-binary/cifar-10-batches-bin/data_batch_5.bin",
+};
+
+const static char* kDataValidatePath[] = {
+    "../../../../train_data/cifar-10-binary/cifar-10-batches-bin/test_batch.bin"
+};
 
 
 
+std::vector<ImageData> originalData()
+{
+    std::vector<ImageData> result;
+
+    for (const char* dataPath : kDataPath)
+    {
+        std::vector<ImageData> oneSet = parseCIFAR10Binary(dataPath);
+        result.insert(result.end(), oneSet.begin(), oneSet.end());
+    }
+
+    return result;
+}
+
+
+
+std::vector<ImageData> validateData()
+{
+    std::vector<ImageData> result;
+
+    for (const char* dataPath : kDataValidatePath)
+    {
+        std::vector<ImageData> oneSet = parseCIFAR10Binary(dataPath);
+        result.insert(result.end(), oneSet.begin(), oneSet.end());
+    }
+
+    return result;
+}
+
+
+
+/*
 void printTensorShape(const torch::Tensor& tensor) {
     std::cout << "Shape: [";
     for (size_t i = 0; i < tensor.sizes().size(); ++i) {
@@ -89,14 +131,16 @@ void printTensorShape(const torch::Tensor& tensor) {
         }
     }
     std::cout << "]" << std::endl;
-}
+}*/
 
 
 
 int main(int argc, const char * argv[])
 {
-    std::vector<ImageData> data = parseCIFAR10Binary(kDataPath);
+    std::vector<ImageData> data = originalData(); // parseCIFAR10Binary(kDataPath[0]);
     printf("Data Set: %ld.\n", data.size());
+
+    std::vector<ImageData> validateDataVector = validateData();
 
     for (size_t i = 0; i < 4; ++i)
     {
@@ -119,23 +163,26 @@ int main(int argc, const char * argv[])
     auto device = torch::device(torch::kCUDA);
 
 
-    torch::Tensor image1Tensor1 = imageDataToTensor(data[1]);
+    /*torch::Tensor image1Tensor1 = imageDataToTensor(data[1]);
     torch::Tensor image1Tensor2 = imageDataToTensor(data[2]);
-    torch::Tensor imageTensor = torch::stack({image1Tensor1, image1Tensor2}, 0);
+    torch::Tensor imageTensor = torch::stack({image1Tensor1, image1Tensor2}, 0);*/
+
+    printf("Before create model.\n");
 
     ImageCategoryNet categoryNet;
     categoryNet->to(torch::kCUDA);
 
     printf("Model created.\n");
 
-    auto categoryTensor = categoryNet(imageTensor.to(torch::kCUDA));
+    //auto categoryTensor = categoryNet(imageTensor.to(torch::kCUDA));
 
-    printTensorShape(categoryTensor);
-    printf("Forward pass.\n");
+    //printTensorShape(categoryTensor);
+    //printf("Forward pass.\n");
 
 
-/*
+
     ImageDataSet dataSet(data);
+    ImageDataSet validateDataSet(validateDataVector);
     //auto batchedDataset = torch::data::datasets::BatchDataset<ImageDataSet, torch::data::Example<>>(
     //    dataSet, 64);
 
@@ -149,55 +196,93 @@ int main(int argc, const char * argv[])
 
     //printf("Number of batches: %ld.\n", dataLoader->size());
 
-    for (std::vector<torch::data::Example<>>& batch : *dataLoader)
-    {
-        printf("Batch size: %ld.\n", batch.size());
-        for (const auto& batchItem : batch) {
-            torch::Tensor tensor = batchItem.data;
+    std::shared_ptr<torch::optim::SGD> optimizer = std::make_shared<torch::optim::SGD>(categoryNet->parameters(), torch::optim::SGDOptions(0.02).momentum(0.5));
 
-            printTensorShape(tensor);
+    std::vector<torch::Tensor> validateTensorList;
+    std::vector<torch::Tensor> validateLabelList;
+    for (size_t index = 0; index < validateDataSet.size(); ++index)
+    {
+        validateTensorList.push_back(validateDataSet.get(index).data);
+        validateLabelList.push_back(validateDataSet.get(index).target);
+    }
+    auto batchTensor = torch::stack(validateTensorList, 0);
+    auto categoryLabels = torch::stack(validateLabelList, 0);
+
+    
+
+
+    for (int epoch = 0; epoch < 10000; ++epoch)
+    {
+        float lossValue = 0;
+        size_t batchNumber = 0;
+
+        for (std::vector<torch::data::Example<>>& batch : *dataLoader)
+        {
+            std::vector<torch::Tensor> batchTensorList;
+            std::vector<torch::Tensor> labelTensorList;
+
+            //printf("Batch size: %ld.\n", batch.size());
+            for (const auto& batchItem : batch) {
+                batchTensorList.push_back(batchItem.data);
+                labelTensorList.push_back(batchItem.target);
+            }
+
+            auto batchTensor = torch::stack(batchTensorList, 0);
+            auto categoryResult = categoryNet(batchTensor.to(torch::kCUDA));
+            auto categoryLabels = torch::stack(labelTensorList, 0);
+
+            torch::nn::CrossEntropyLoss lossFunction;
+            auto loss = lossFunction(categoryResult, categoryLabels.to(torch::kCUDA));
+
+            optimizer->zero_grad();
+            loss.backward();
+
+            optimizer->step();
+
+            lossValue += loss.item<float>();
+            batchNumber += 1;
+
+            
+
+
         }
 
-        //printTensorShape(batch.label);
+
+
+        lossValue /= (float)batchNumber;
+        printf("Epoch %d: Loss %f.\n", epoch, lossValue);
+
+        if (lossValue < 0.5)
+        {
+            optimizer = std::make_shared<torch::optim::SGD>(categoryNet->parameters(), torch::optim::SGDOptions(0.005).momentum(0.1));
+        }
+
+        if (lossValue < 0.3)
+        {
+            optimizer = std::make_shared<torch::optim::SGD>(categoryNet->parameters(), torch::optim::SGDOptions(0.002));
+        }
+
+        if (lossValue < 0.2)
+        {
+            optimizer = std::make_shared<torch::optim::SGD>(categoryNet->parameters(), torch::optim::SGDOptions(0.0005));
+        }
+
+
+        {
+            torch::NoGradGuard no_grad_guard;
+
+            auto categoryResult = categoryNet(batchTensor.to(torch::kCUDA));
+        
+            torch::nn::CrossEntropyLoss lossFunction;
+            auto loss = lossFunction(categoryResult, categoryLabels.to(torch::kCUDA));
+
+            printf("Validate loss: %f.\n", loss.item<float>());
+        }
+
+
+        fflush(stdout);
+    
     }
-    */
-
-
-    torch::Tensor t_c = torch::tensor({0.5,  14.0, 15.0, 28.0, 11.0,  8.0,  3.0, -4.0,  6.0, 13.0, 21.0}, device);
-    torch::Tensor t_u = torch::tensor({35.7, 55.9, 58.2, 81.9, 56.3, 48.9, 33.9, 21.8, 48.4, 60.4, 68.4}, device);
-    t_c = t_c.unsqueeze(1);
-    t_u = t_u.unsqueeze(1);
-    
-    long long nSamples = t_u.sizes()[0];
-    long long nVal = 0.2 * nSamples;
-    
-    torch::Tensor shuffledIndices = torch::randperm(nSamples, device);
-    
-    torch::Tensor train_indices = shuffledIndices.slice(0, 0, nSamples - nVal);
-    torch::Tensor val_indices = shuffledIndices.slice(0, nSamples - nVal, nSamples);
-    
-    torch::Tensor uTraining = t_u.index_select(0, train_indices);
-    torch::Tensor cTraining = t_c.index_select(0, train_indices);
-    
-    torch::Tensor uVal = t_u.index_select(0, val_indices);
-    torch::Tensor cVal = t_c.index_select(0, val_indices);
-    
-    torch::Tensor unTraining = 0.1 * uTraining;
-    torch::Tensor unVal = 0.1 * uVal;
-
-    
-    // model, optimizer, training loop
-    
-    SequentialTanh tanModel;
-    torch::optim::SGD optimizer(tanModel->parameters(), 1e-3);
-
-    auto lossFunc = torch::nn::MSELoss();
-
-    tanModel->to(torch::kCUDA);
-    lossFunc->to(torch::kCUDA);
-    
-    training_loop(6001, &optimizer, tanModel, lossFunc,
-                  unTraining, unVal, cTraining, cVal);
     
     
     return 0;
