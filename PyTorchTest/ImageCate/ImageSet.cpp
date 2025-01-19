@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include "ImageSet.h"
+#include "TorchUtils.h"
 
 #include <stdio.h>
 
@@ -99,29 +100,16 @@ torch::optional<size_t> ImageDataSet::size() const
 
 torch::data::Example<> ImageDataSet::get(size_t index)
 {
-    printf("Get data item: %ld.\n", index);
+    ImageData& data = _imageData[index];
+    torch::Tensor dataTensor = imageDataToTensor(data);
 
-    auto data = _imageData[index];
-    auto dataTensor = imageDataToTensor(data);
-    auto labelTensor = torch::tensor(static_cast<int64_t>(data.label), torch::kLong);
+    if (data.label < 0 || data.label >= 10)
+        throw std::out_of_range("Index is out of range for one-hot encoding.");
+
+    // one-hot
+    auto one_hot = torch::eye(10);
+    torch::Tensor labelTensor = one_hot.index({(int64_t)data.label});
 
     return {dataTensor, labelTensor};
 }
-
-
-/*std::vector<torch::data::Example<>> ImageDataSet::get_batch(torch::ArrayRef<size_t> indices)
- {
-    std::vector<torch::data::Example<>> batch;
-    for (auto index : indices)
-    {
-         batch.push_back(get(index));
-    }
-    return batch;
-}*/
-
-
-/*void ImageDataSet::reset() override
-{
-    std::shuffle(_indices.begin(), _indices.end(), _rng); // Shuffle indices
-}*/
 
